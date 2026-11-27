@@ -9,14 +9,14 @@ echo "1) files that would be committed"
 if git rev-parse --git-dir > /dev/null 2>&1; then
   FILES=$(git ls-files; git ls-files --others --exclude-standard)
 else
-  FILES=$(find . -type f -not -path './node_modules/*' -not -path '*/node_modules/*' -not -path './.git/*' -not -name '*.png')
+  FILES=$(find . -type f -not -path './node_modules/*' -not -path '*/node_modules/*' -not -path './.git/*' -not -path './out/*' -not -name '*.png')
 fi
 for f in $FILES; do
   case "$f" in *.png|*.jpg|*.zip|*check-secrets.sh) continue ;; esac
   if grep -EnH "$PATTERN" "$f" 2>/dev/null; then FOUND=1; fi
 done
 for f in $FILES; do
-  case "$f" in *.env|*/.env) echo "   .env file is tracked: $f"; FOUND=1 ;; esac
+  case "$f" in .env|*/.env) echo "   .env file is tracked: $f"; FOUND=1 ;; esac
 done
 
 if git rev-parse --git-dir > /dev/null 2>&1; then

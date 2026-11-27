@@ -1,10 +1,12 @@
 // Listing photos.
 //   PHOTO_BUCKET set -> PRIVATE Amazon S3 bucket (Floci / AWS). The API reads the
 //                       photo and returns it, so the bucket never has to be public.
-//   not set          -> in memory (local PC / tests)
+//   not set          -> the database (Neon Postgres on Vercel, JSON file on your PC):
+//                       Vercel has no S3 and its disk is temporary, so the photo
+//                       (max 1 MB, base64) is stored as a row in the Photos table.
 const config = require('../../config');
+const { tables } = require('../../store');
 
-const memory = new Map();
 let s3;
 
 function client() {
@@ -17,7 +19,10 @@ function client() {
 }
 
 async function putPhoto(key, buffer, contentType) {
-  if (!config.photoBucket) { memory.set(key, { buffer, contentType }); return; }
+  if (!config.photoBucket) {
+    await tables.photos.create({ id: key, contentType, data: buffer.toString('base64'), createdAt: new Date().toISOString() });
+    return;
+  }
   const { PutObjectCommand } = require('@aws-sdk/client-s3');
   await client().send(new PutObjectCommand({
     Bucket: config.photoBucket, Key: key, Body: buffer, ContentType: contentType,
@@ -26,7 +31,10 @@ async function putPhoto(key, buffer, contentType) {
 }
 
 async function getPhoto(key) {
-  if (!config.photoBucket) return memory.get(key) || null;
+  if (!config.photoBucket) {
+    const row = await tables.photos.get(key);
+    return row ? { buffer: Buffer.from(row.data, 'base64'), contentType: row.contentType } : null;
+  }
   const { GetObjectCommand } = require('@aws-sdk/client-s3');
   try {
     const out = await client().send(new GetObjectCommand({ Bucket: config.photoBucket, Key: key }));
@@ -40,7 +48,7 @@ async function getPhoto(key) {
 
 async function deletePhoto(key) {
   if (!key) return;
-  if (!config.photoBucket) { memory.delete(key); return; }
+  if (!config.photoBucket) { await tables.photos.remove(key).catch(() => {}); return; }
   const { DeleteObjectCommand } = require('@aws-sdk/client-s3');
   await client().send(new DeleteObjectCommand({ Bucket: config.photoBucket, Key: key })).catch(() => {});
 }
