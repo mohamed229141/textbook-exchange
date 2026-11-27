@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.vercel/
+
+# build output and local data (never commit)
+*.zip
+out/
+backend/data/
+infra/.aws.env

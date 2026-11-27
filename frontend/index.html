@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://books.google.com; connect-src 'self' http://localhost:3000 http://*.localhost.floci.io:4566 https://*.amazonaws.com https://*.vercel.app; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Textbook Exchange</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">TX</span>
+      <div>
+        <h1>Textbook Exchange</h1>
+        <p class="tagline">Used course books, from students to students</p>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Main">
+      <button class="tab active" data-view="browse" type="button">Browse</button>
+      <button class="tab auth-only" data-view="sell" type="button">Sell a book</button>
+      <button class="tab auth-only" data-view="mine" type="button">My listings</button>
+      <button class="tab auth-only" data-view="requests" type="button">Requests</button>
+      <button class="tab auth-only" data-view="alerts" type="button">Course alerts</button>
+      <button class="tab admin-only" data-view="admin" type="button">Admin</button>
+    </nav>
+    <div class="account">
+      <button id="bell" class="bell auth-only" type="button" aria-label="Notifications">
+        <span aria-hidden="true">&#128276;</span><span id="bell-count" class="badge hidden">0</span>
+      </button>
+      <button id="profile-btn" class="link auth-only" type="button"></button>
+      <button id="logout-btn" class="ghost auth-only" type="button">Log out</button>
+      <button id="login-btn" class="primary guest-only" type="button">Log in / Sign up</button>
+    </div>
+  </header>
+
+  <p id="api-status" class="api-status">Connecting to the API...</p>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <main>
+    <!-- BROWSE (Listings service) -->
+    <section id="view-browse" class="view">
+      <form id="search-form" class="filters">
+        <label>Course code<input name="courseCode" placeholder="e.g. CS101" maxlength="12"></label>
+        <label>Search<input name="q" placeholder="title, author, ISBN" maxlength="60"></label>
+        <label>Condition
+          <select name="condition"><option value="">Any</option><option>New</option><option>Like New</option><option>Good</option><option>Fair</option><option>Poor</option></select>
+        </label>
+        <label>Max price (EGP)<input name="maxPrice" type="number" min="0" max="5000"></label>
+        <label>Sort
+          <select name="sort"><option value="newest">Newest</option><option value="price_asc">Price: low to high</option><option value="price_desc">Price: high to low</option></select>
+        </label>
+        <button class="primary" type="submit">Search</button>
+      </form>
+      <div id="price-guide" class="price-guide hidden"></div>
+      <p id="result-count" class="muted"></p>
+      <div id="listing-grid" class="grid"></div>
+    </section>
+
+    <!-- SELL (Book Listing service + Google Books) -->
+    <section id="view-sell" class="view hidden">
+      <div class="panel narrow">
+        <h2 id="sell-title">Sell a textbook</h2>
+        <p class="muted">Type the ISBN and press <b>Look up</b>: we fill in the details from Google Books and mark your listing as <i>ISBN verified</i>. Your listing stays online until the end of the semester: <b id="semester-end">loading...</b>.</p>
+        <form id="sell-form" class="form-grid">
+          <input type="hidden" name="id">
+          <label class="span2">ISBN (optional)
+            <span class="inline"><input name="isbn" placeholder="978-0-262-03384-8" maxlength="20"><button id="isbn-lookup" type="button" class="ghost">Look up</button></span>
+          </label>
+          <div id="isbn-result" class="isbn-result span2 hidden"></div>
+          <label>Course code *<input name="courseCode" required maxlength="12" placeholder="CS101"></label>
+          <label>Condition *
+            <select name="condition" required><option>New</option><option>Like New</option><option selected>Good</option><option>Fair</option><option>Poor</option></select>
+          </label>
+          <label class="span2">Title *<input name="title" required minlength="2" maxlength="150"></label>
+          <label>Author *<input name="author" required minlength="2" maxlength="120"></label>
+          <label>Edition<input name="edition" maxlength="30" placeholder="3rd"></label>
+          <label>Price (EGP) *<input name="price" type="number" required min="1" max="5000" step="0.01"></label>
+          <label>Photo (JPEG/PNG/WebP, max 1 MB)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label>
+          <label class="span2">Description<textarea name="description" maxlength="1000" rows="3" placeholder="Highlighting, missing pages, where to meet..."></textarea></label>
+          <div id="sell-guide" class="price-guide span2 hidden"></div>
+          <div class="span2 actions">
+            <button class="primary" type="submit" id="sell-submit">Publish listing</button>
+            <button class="ghost hidden" type="button" id="sell-cancel">Cancel edit</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- MY LISTINGS -->
+    <section id="view-mine" class="view hidden">
+      <h2>My listings</h2>
+      <div id="mine-list" class="list"></div>
+    </section>
+
+    <!-- REQUESTS (Requests service) -->
+    <section id="view-requests" class="view hidden">
+      <div class="subtabs">
+        <button class="subtab active" data-box="incoming" type="button">Incoming (I sell)</button>
+        <button class="subtab" data-box="outgoing" type="button">Outgoing (I buy)</button>
+      </div>
+      <div id="request-list" class="list"></div>
+    </section>
+
+    <!-- COURSE ALERTS (Course Alerts service) -->
+    <section id="view-alerts" class="view hidden">
+      <div class="panel narrow">
+        <h2>Course alerts</h2>
+        <p class="muted">Follow a course and get a notification as soon as a matching book is listed. Alerts end with the semester; you can have 10.</p>
+        <form id="alert-form" class="filters">
+          <label>Course code *<input name="courseCode" required maxlength="12" placeholder="CS201"></label>
+          <label>Max price (EGP)<input name="maxPrice" type="number" min="1" max="5000"></label>
+          <label>At least condition
+            <select name="minCondition"><option value="">Any</option><option>New</option><option>Like New</option><option>Good</option><option>Fair</option><option>Poor</option></select>
+          </label>
+          <button class="primary" type="submit">Create alert</button>
+        </form>
+      </div>
+      <div id="alert-list" class="list"></div>
+      <div id="alert-matches" class="grid"></div>
+    </section>
+
+    <!-- ADMIN (shared login + stats from all services) -->
+    <section id="view-admin" class="view hidden">
+      <div class="admin-head">
+        <h2>Administration</h2>
+        <button id="run-jobs" class="ghost" type="button">Run expiry jobs now</button>
+      </div>
+      <div id="stats" class="stats"></div>
+      <h3>Reports to review</h3>
+      <div id="report-queue" class="list"></div>
+      <h3>Semester end (listings and alerts expire on this date)</h3>
+      <form id="semester-form" class="filters">
+        <label>Semester<input name="name" required placeholder="Fall 2026" maxlength="20"></label>
+        <label>Ends on<input name="endsAt" type="date" required></label>
+        <span id="semester-current" class="muted"></span>
+        <button class="primary" type="submit">Save semester end</button>
+      </form>
+      <h3>Users</h3>
+      <div class="table-wrap"><table id="users-table"><thead><tr><th>Name</th><th>E-mail</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead><tbody></tbody></table></div>
+      <h3>All requests</h3>
+      <div id="admin-requests" class="list"></div>
+    </section>
+  </main>
+
+  <!-- Notifications drawer -->
+  <aside id="drawer" class="drawer hidden" aria-label="Notifications">
+    <div class="drawer-head"><h2>Notifications</h2><button id="read-all" class="link" type="button">Mark all read</button><button id="drawer-close" class="ghost" type="button">Close</button></div>
+    <div id="notification-list"></div>
+  </aside>
+
+  <!-- Login / register -->
+  <dialog id="auth-dialog">
+    <form id="login-form" method="dialog" class="stack">
+      <h2>Log in</h2>
+      <label>E-mail<input name="email" type="email" required autocomplete="username"></label>
+      <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
+      <p class="form-error" data-error></p>
+      <button class="primary" type="submit">Log in</button>
+      <button class="link" type="button" data-switch="register">No account? Sign up</button>
+    </form>
+    <form id="register-form" method="dialog" class="stack hidden">
+      <h2>Create your account</h2>
+      <label>Display name<input name="displayName" required minlength="2" maxlength="50" autocomplete="name"></label>
+      <label>University e-mail<input name="email" type="email" required autocomplete="email"></label>
+      <label>Password <small>(8+ characters, a letter and a digit)</small><input name="password" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+      <label>Phone (shared only after you accept a request)<input name="phone" maxlength="20"></label>
+      <p class="form-error" data-error></p>
+      <button class="primary" type="submit">Sign up</button>
+      <button class="link" type="button" data-switch="login">Already registered? Log in</button>
+    </form>
+    <button class="close-x" type="button" data-close aria-label="Close">&times;</button>
+  </dialog>
+
+  <!-- Purchase request -->
+  <dialog id="request-dialog">
+    <form id="request-form" method="dialog" class="stack">
+      <h2>Request this book</h2>
+      <p id="request-book" class="muted"></p>
+      <input type="hidden" name="listingId">
+      <label>Your offer (EGP)<input name="offerPrice" type="number" step="0.01" required></label>
+      <small id="offer-hint" class="muted"></small>
+      <label>Message to the seller<textarea name="message" maxlength="500" rows="3" placeholder="When and where can we meet?"></textarea></label>
+      <p class="form-error" data-error></p>
+      <button class="primary" type="submit">Send request</button>
+    </form>
+    <button class="close-x" type="button" data-close aria-label="Close">&times;</button>
+  </dialog>
+
+  <!-- Report a listing (Moderation service) -->
+  <dialog id="report-dialog">
+    <form id="report-form" method="dialog" class="stack">
+      <h2>Report this listing</h2>
+      <p id="report-book" class="muted"></p>
+      <input type="hidden" name="listingId">
+      <label>Reason
+        <select name="reason" required>
+          <option value="fake_listing">Fake listing (book does not exist)</option>
+          <option value="wrong_details">Wrong book details</option>
+          <option value="scam">Scam attempt</option>
+          <option value="inappropriate">Inappropriate content</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Details<textarea name="details" maxlength="500" rows="3" placeholder="What is wrong? (needed for Other)"></textarea></label>
+      <small class="muted">After 3 students report a listing it is hidden until a moderator checks it.</small>
+      <p class="form-error" data-error></p>
+      <button class="danger" type="submit">Send report</button>
+    </form>
+    <button class="close-x" type="button" data-close aria-label="Close">&times;</button>
+  </dialog>
+
+  <!-- Profile -->
+  <dialog id="profile-dialog">
+    <form id="profile-form" method="dialog" class="stack">
+      <h2>My profile</h2>
+      <p id="profile-email" class="muted"></p>
+      <label>Display name<input name="displayName" required minlength="2" maxlength="50"></label>
+      <label>Phone<input name="phone" maxlength="20"></label>
+      <label>Faculty<input name="faculty" maxlength="60"></label>
+      <p class="form-error" data-error></p>
+      <button class="primary" type="submit">Save profile</button>
+    </form>
+    <form id="password-form" method="dialog" class="stack">
+      <h3>Change password</h3>
+      <label>Current password<input name="currentPassword" type="password" required autocomplete="current-password"></label>
+      <label>New password<input name="newPassword" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></label>
+      <p class="form-error" data-error></p>
+      <button class="ghost" type="submit">Change password</button>
+    </form>
+    <button class="close-x" type="button" data-close aria-label="Close">&times;</button>
+  </dialog>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

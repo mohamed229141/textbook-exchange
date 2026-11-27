@@ -1,0 +1,75 @@
+Checking Textbook Exchange on Floci
+API: http://0377300c66.execute-api.localhost.floci.io:4566
+
+--- AWS resources
+PASS DynamoDB table TbxUsers exists
+PASS DynamoDB table TbxListings exists
+PASS DynamoDB table TbxRequests exists
+PASS DynamoDB table TbxNotifications exists
+PASS DynamoDB table TbxReports exists
+PASS DynamoDB table TbxAlerts exists
+PASS DynamoDB table TbxSettings exists
+PASS Secrets Manager secret tbx/app-secrets exists
+PASS CloudWatch log group /tbx/audit exists
+{
+    "BucketRegion": "us-east-1"
+}
+{
+    "BucketRegion": "us-east-1"
+}
+PASS S3 buckets tbx-web and tbx-listing-photos exist
+PASS SNS topic tbx-notifications exists
+PASS SQS queues exist
+PASS EventBridge rule tbx-expiry-schedule exists
+PASS Lambda tbx-identity-fn exists
+PASS Lambda tbx-listings-fn exists
+PASS Lambda tbx-requests-fn exists
+PASS Lambda tbx-moderation-fn exists
+PASS Lambda tbx-alerts-fn exists
+PASS Lambda tbx-jobs-fn exists
+
+--- the four services (and shared login) through API Gateway
+PASS GET /api/health answers 200 from Lambda
+PASS Identity: register seller 201
+PASS Identity: login 200 (JWT signed with the key from Secrets Manager)
+PASS Course Alerts: buyer follows CHK101 (201)
+PASS Book Listing: semester end is readable (Fall 2026, calendar)
+PASS Listings: create listing 201
+INFO Google Books not reachable from the Lambda container (listing saved unverified)
+PASS Integration: new listing matched the buyer's course alert (Listings -> Alerts)
+PASS Moderation: student reports a listing (201)
+PASS Moderation: seller cannot report own listing (403)
+PASS Listings: search by course code (DynamoDB Query on course-index)
+PASS Listings: photo upload 200
+PASS S3: photo object stored in private bucket tbx-listing-photos
+PASS Listings: photo read back through the API
+PASS Requests: purchase request 201
+PASS Requests: seller got an in-app notification
+PASS Requests: seller accepts 200, contact details shared
+PASS Integration: listing became Reserved (Requests -> Listings)
+PASS Integration: completing the request marks the listing Sold
+PASS SQS: request events in tbx-request-events (13 messages)
+PASS SNS -> SQS: notifications delivered to tbx-notification-delivery (13 messages)
+PASS CloudWatch Logs: audit events written to /tbx/audit
+PASS Lambda tbx-jobs-fn (EventBridge target) runs the expiry job
+
+--- security
+PASS SEC no token -> 401
+PASS SEC tampered token -> 401
+PASS SEC student on admin route -> 403
+PASS SEC student on moderation queue -> 403
+PASS SEC IDOR edit another user's listing -> 403
+PASS SEC IDOR read another user's request -> 403
+PASS SEC mass assignment role=admin -> 400
+PASS SEC invalid input -> 400
+PASS SEC unknown route stopped by API Gateway (404, Lambda never ran)
+PASS SEC CORS refuses http://evil.example
+PASS SEC CORS allows the website http://localhost:4566
+PASS SEC photo bucket is not public (anonymous GET refused)
+
+--- website
+PASS index.html served from S3
+PASS config.js points at this API
+PASS no .env or backend files in the website bucket
+
+Result: 56 passed, 0 failed
