@@ -6,7 +6,7 @@ const FLOCI_API = 'http://0377300c66.execute-api.localhost.floci.io:4566';
 
 // Optional: real AWS / Vercel
 const AWS_API = 'https://YOUR-AWS-API-ID.execute-api.us-east-1.amazonaws.com';
-const VERCEL_API = 'https://YOUR-API-PROJECT.vercel.app';
+const VERCEL_API = 'https://tbx-api-229141.vercel.app';
 
 // Picks the API from the address the page was loaded from:
 //   port 4566       -> Floci (website in the S3 bucket on Floci)
