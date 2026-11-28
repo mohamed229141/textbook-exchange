@@ -21,7 +21,7 @@ done
 
 if git rev-parse --git-dir > /dev/null 2>&1; then
   echo "2) the whole Git history"
-  if git log -p --all | grep -E "$PATTERN" | grep -v 'check-secrets.sh'; then FOUND=1; fi
+  if git log -p --all | grep -E "$PATTERN" | grep -v -e 'check-secrets.sh' -e '^[+-]PATTERN='; then FOUND=1; fi
 fi
 
 if [ $FOUND -eq 0 ]; then echo "No secrets found"; else echo "POSSIBLE SECRETS FOUND - remove them before pushing"; exit 1; fi
