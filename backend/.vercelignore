@@ -1,0 +1,7 @@
+node_modules
+.env
+data
+test
+test-support
+lambda.zip
+scripts/zip-lambda.js
